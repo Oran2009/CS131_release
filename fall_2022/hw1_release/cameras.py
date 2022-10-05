@@ -1,3 +1,4 @@
+from math import sqrt
 from typing import Tuple
 
 import numpy as np
@@ -20,7 +21,12 @@ def camera_from_world_transform(d: float = 1.0) -> np.ndarray:
     """
     T = np.eye(4)
     # YOUR CODE HERE
-    pass
+    T = np.array([
+        [-sqrt(2)/2, 0, sqrt(2)/2, 0],
+        [0, 1, 0, 0],
+        [-sqrt(2)/2, 0, -sqrt(2)/2, d],
+        [0, 0, 0, 1]
+    ])
     # END YOUR CODE
     assert T.shape == (4, 4)
     return T
@@ -55,7 +61,8 @@ def apply_transform(T: np.ndarray, points: np.ndarray) -> Tuple[np.ndarray]:
     points_transformed = np.zeros((3, N))
 
     # YOUR CODE HERE
-    pass
+    homogeneous_points = np.vstack((points, np.ones((1, N))))
+    points_transformed = np.dot(T, homogeneous_points)[:-1]
     # END YOUR CODE
 
     assert points_transformed.shape == (3, N)
@@ -75,7 +82,7 @@ def intersection_from_lines(
         b_1 (np.ndarray): Second point of second line; shape `(2,)`.
 
     Returns:
-        np.ndarray: the intersection of the two lines definied by (a0, a1)
+        np.ndarray: the intersection of the two lines defined by (a0, a1)
                     and (b0, b1).
     """
     # Validate inputs
@@ -86,12 +93,20 @@ def intersection_from_lines(
     out = np.zeros(2)
 
     # YOUR CODE HERE
-    pass
+    s = np.vstack([a_0, a_1, b_0, b_1])
+    h = np.hstack((s, np.ones((4, 1))))
+    l1 = np.cross(h[0], h[1])
+    l2 = np.cross(h[2], h[3])
+    x, y, z = np.cross(l1, l2)
+    if z == 0:
+        out = np.array([float('inf'), float('inf')])
+    else:
+        out = np.array([x/z, y/z])
     # END YOUR CODE
 
     assert out.shape == (2,)
     assert out.dtype == np.float
-
+    
     return out
 
 
@@ -118,7 +133,17 @@ def optical_center_from_vanishing_points(
     optical_center = np.zeros(2)
 
     # YOUR CODE HERE
-    pass
+    A = np.vstack([v0, v1, v2])
+    def h(a,A,b,B,c,C):
+        if A==B:b,B,c,C=c,C,b,B
+        m=(a-b)/(B-A)
+        return m,C-m*c
+    def f(a,A,b,B,c,C):
+        m,q=h(a,A,b,B,c,C)
+        k,z=h(c,C,b,B,a,A)
+        x=(q-z)/(k-m)
+        return np.array([x,k*x+z])
+    optical_center = f(v0[0], v0[1], v1[0], v1[1], v2[0], v2[1])
     # END YOUR CODE
 
     assert optical_center.shape == (2,)
@@ -144,7 +169,7 @@ def focal_length_from_two_vanishing_points(
     f = None
 
     # YOUR CODE HERE
-    pass
+    f = sqrt(np.dot(-(v0-optical_center), (v1-optical_center)))
     # END YOUR CODE
 
     return float(f)
@@ -168,7 +193,7 @@ def physical_focal_length_from_calibration(
     f_mm = None
 
     # YOUR CODE HERE
-    pass
+    f_mm = f * sensor_diagonal_mm / image_diagonal_pixels
     # END YOUR CODE
 
     return f_mm
