@@ -145,19 +145,16 @@ def match_descriptors(desc1, desc2, threshold=0.5):
         matches: an array of shape (Q, 2) where each row holds the indices of one pair
         of matching descriptors
     """
-    matches = np.array([])
+    matches = []
 
     M = desc1.shape[0]
     dists = cdist(desc1, desc2)
 
     ### YOUR CODE HERE
-    for ix, dist in enumerate(dists, start=0):
-        for jx, d in enumerate(dist, start=0):
-            _d = np.sort(d)
-            if abs(_d[0]-_d[1]) < threshold:
-                match = [ix, jx]
-                matches = np.vstack([matches, match])
-    matches = np.asarray(matches)
+    _dists = np.sort(dists, axis=1)
+    matches = np.concatenate([np.arange(M).reshape(-1, 1), np.argmin(dists, axis=1).reshape(-1, 1)], axis=1)
+    match = _dists[:, 0] / _dists[:, 1] < threshold
+    matches = matches[match]
     ### END YOUR CODE
 
     return matches
@@ -190,7 +187,7 @@ def fit_affine_matrix(p1, p2):
     p2 = pad(p2)
 
     ### YOUR CODE HERE
-    pass
+    H = np.linalg.lstsq(p2, p1, rcond=None)[0]
     ### END YOUR CODE
 
     # Sometimes numerical issues cause least-squares to produce the last
@@ -241,8 +238,8 @@ def ransac(keypoints1, keypoints2, matches, n_iters=200, threshold=20):
     N = matches.shape[0]
     n_samples = int(N * 0.2)
 
-    matched1 = pad(keypoints1[matches[:,0]])
-    matched2 = pad(keypoints2[matches[:,1]])
+    _matched1, matched1 = keypoints1[matches[:,0]], pad(keypoints1[matches[:,0]])
+    _matched2, matched2 = keypoints2[matches[:,1]], pad(keypoints2[matches[:,1]])
 
     max_inliers = np.zeros(N, dtype=bool)
     n_inliers = 0
@@ -253,15 +250,24 @@ def ransac(keypoints1, keypoints2, matches, n_iters=200, threshold=20):
     # `np.random.shuffle()` followed by slicing out the first `n_samples`
     # matches here in order to align with the auto-grader.
     # Sample with this code: 
+    
+    ### YOUR CODE HERE
     for i in range(n_iters):
         # 1. Select random set of matches
         np.random.shuffle(matches)
         samples = matches[:n_samples]
-        sample1 = pad(keypoints1[samples[:,0]])
-        sample2 = pad(keypoints2[samples[:,1]])
-    
-    ### YOUR CODE HERE
-    pass
+        sample1 = keypoints1[samples[:,0]]
+        sample2 = keypoints2[samples[:,1]]
+        # 2. Compute affine transformation matrix
+        H = fit_affine_matrix(sample1, sample2)
+        # 3. Compute inliers via Euclidean distance
+        _inliers = np.sqrt(((matched2.dot(H) - matched1) ** 2).sum(axis=-1)) < threshold
+        _n_inliers = _inliers.sum()
+        # 4. Keep the largest set of inliers
+        if _n_inliers > n_inliers:
+            max_inliers, n_inliers = _inliers, _n_inliers
+    # 5. Re-compute least-squares estimate on all of the inliers
+    H = fit_affine_matrix(_matched1[max_inliers], _matched2[max_inliers])
     ### END YOUR CODE
     return H, orig_matches[max_inliers]
 
@@ -296,7 +302,13 @@ def linear_blend(img1_warped, img2_warped):
     left_margin = np.argmax(img2_mask[out_H//2, :].reshape(1, out_W), 1)[0]
 
     ### YOUR CODE HERE
-    pass
+    weight1, weight2 = np.ones_like(img1_warped), np.ones_like(img2_warped)
+    if left_margin < right_margin:
+        n = right_margin - left_margin + 1
+        weight1[:, left_margin:right_margin + 1] = np.linspace(1, 0, n)
+        weight2[:, left_margin:right_margin + 1] = np.linspace(0, 1, n)
+    merged = weight1 * img1_warped + weight2 * img2_warped
+    merged /= np.maximum(img1_mask + img2_mask, 1)
     ### END YOUR CODE
 
     return merged
