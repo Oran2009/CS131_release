@@ -145,13 +145,19 @@ def match_descriptors(desc1, desc2, threshold=0.5):
         matches: an array of shape (Q, 2) where each row holds the indices of one pair
         of matching descriptors
     """
-    matches = []
+    matches = np.array([])
 
     M = desc1.shape[0]
     dists = cdist(desc1, desc2)
 
     ### YOUR CODE HERE
-    pass
+    for ix, dist in enumerate(dists, start=0):
+        for jx, d in enumerate(dist, start=0):
+            _d = np.sort(d)
+            if abs(_d[0]-_d[1]) < threshold:
+                match = [ix, jx]
+                matches = np.vstack([matches, match])
+    matches = np.asarray(matches)
     ### END YOUR CODE
 
     return matches
