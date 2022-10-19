@@ -349,18 +349,27 @@ def stitch_multiple_images(imgs, desc_func=simple_descriptor, patch_size=5):
         matches.append(mtchs)
 
     ### YOUR CODE HERE
+
     # Need to get H, output space, offset to warp image
+
+    # Get H
     H = [np.eye(3)]
     for i in range(len(imgs) - 1):
         H.append(ransac(keypoints[i], keypoints[i + 1], matches[i])[0])
     for i in range(1, len(imgs)):
         H[i] = H[i].dot(H[i - 1])
+
+    # Get output space and offset
     output_space, offset = get_output_space(imgs[0], imgs[1:], H[1:])
+
+    # Get warped images
     warped_imgs = []
     for i in range(len(imgs)):
         warped_imgs.append(warp_image(imgs[i], H[i], output_space, offset))
         img_mask = (warped_imgs[-1] != -1)
         warped_imgs[-1][~img_mask] = 0
+
+    # Linear blend images from left to right
     panorama = warped_imgs[0]
     for i in range(1, len(imgs)):
         panorama = linear_blend(panorama, warped_imgs[i])
