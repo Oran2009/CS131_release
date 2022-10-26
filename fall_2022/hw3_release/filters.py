@@ -8,6 +8,7 @@ Python Version: 3.5+
 """
 
 import numpy as np
+from sklearn.feature_extraction.image import extract_patches_2d
 
 
 def conv_nested(image, kernel):
@@ -29,7 +30,13 @@ def conv_nested(image, kernel):
     out = np.zeros((Hi, Wi))
 
     ### YOUR CODE HERE
-    pass
+    w, h = Wk // 2, Hk // 2
+    for m in range(Hi):
+        for n in range(Wi):
+            for i in range(Hk):
+                for j in range(Wk):
+                    if 0 <= m + h - i < Hi and 0 <= n + w - j < Wi:
+                        out[m, n] += kernel[i, j] * image[m + h - i, n + w - j]    
     ### END YOUR CODE
 
     return out
@@ -56,7 +63,7 @@ def zero_pad(image, pad_height, pad_width):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out = np.pad(image, [(pad_height, ), (pad_width, )], mode='constant')
     ### END YOUR CODE
     return out
 
@@ -85,7 +92,11 @@ def conv_fast(image, kernel):
     out = np.zeros((Hi, Wi))
 
     ### YOUR CODE HERE
-    pass
+    pad_image = zero_pad(image, Hk // 2, Wk // 2)
+    kernel = np.flip(kernel, (0, 1))
+    for i in range(Hi):
+        for j in range(Wi):
+            out[i][j] = np.sum(pad_image[i:i + Hk, j:j + Wk] * kernel)
     ### END YOUR CODE
 
     return out
@@ -105,7 +116,7 @@ def cross_correlation(f, g):
 
     out = None
     ### YOUR CODE HERE
-    pass
+    out = conv_fast(f, g[::-1, ::-1])
     ### END YOUR CODE
 
     return out
@@ -127,7 +138,7 @@ def zero_mean_cross_correlation(f, g):
 
     out = None
     ### YOUR CODE HERE
-    pass
+    out = cross_correlation(f, g - g.mean())
     ### END YOUR CODE
 
     return out
@@ -151,7 +162,25 @@ def normalized_cross_correlation(f, g):
 
     out = None
     ### YOUR CODE HERE
-    pass
+    Hf, Wf = f.shape
+    Hg, Wg = g.shape
+
+    g = (g - np.mean(g)) / np.std(g)
+
+    out = np.zeros((Hf, Wf))
+
+    pad_height, pad_width = 100, 100
+    padded_image = zero_pad(f, pad_height, pad_width)
+    m, n = pad_height, pad_width
+    while m < Hf + pad_height:
+        n = pad_width
+        while n < Wf + pad_height:
+            dim1, dim2 = Hg % 2, Wg % 2
+            a = padded_image[m - int(Hg / 2):m + int(Hg / 2) + dim1, n - int(Wg / 2):n + int(Wg / 2) + dim2]
+            mul=np.sum(((a - np.mean(a)) / np.std(a)) * g)
+            out[m - pad_height, n - pad_width]=mul
+            n += 1
+        m += 1
     ### END YOUR CODE
 
     return out
