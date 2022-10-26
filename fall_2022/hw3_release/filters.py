@@ -8,8 +8,6 @@ Python Version: 3.5+
 """
 
 import numpy as np
-from sklearn.feature_extraction.image import extract_patches_2d
-
 
 def conv_nested(image, kernel):
     """A naive implementation of convolution filter.
