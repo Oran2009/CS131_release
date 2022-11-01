@@ -8,6 +8,7 @@ Python Version: 3.5+
 """
 
 import numpy as np
+from collections import deque
 
 def conv(image, kernel):
     """ An implementation of convolution filter.
@@ -36,7 +37,10 @@ def conv(image, kernel):
     padded = np.pad(image, pad_width, mode='edge')
 
     ### YOUR CODE HERE
-    pass
+    kernel = np.flip(kernel, (0, 1))
+    for i in range(Hi):
+        for j in range(Wi):
+            out[i][j] = np.sum(padded[i:i + Hk, j:j + Wk] * kernel)
     ### END YOUR CODE
 
     return out
@@ -61,7 +65,8 @@ def gaussian_kernel(size, sigma):
     kernel = np.zeros((size, size))
 
     ### YOUR CODE HERE
-    pass
+    d = (np.arange(size) - size // 2) ** 2
+    kernel = (1 / (2 * np.pi * sigma ** 2)) * np.exp(-(d.reshape(size, 1) + d.reshape(1, size)) / (2 * sigma ** 2))
     ### END YOUR CODE
 
     return kernel
@@ -81,7 +86,8 @@ def partial_x(img):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    kernel = np.array([0.5, 0, -0.5]).reshape(1, -1)
+    out = conv(img, kernel)
     ### END YOUR CODE
 
     return out
@@ -101,7 +107,8 @@ def partial_y(img):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    kernel = np.array([0.5, 0, -0.5]).reshape(-1, 1)
+    out = conv(img, kernel)
     ### END YOUR CODE
 
     return out
@@ -125,7 +132,9 @@ def gradient(img):
     theta = np.zeros(img.shape)
 
     ### YOUR CODE HERE
-    pass
+    px, py = partial_x(img), partial_y(img)
+    G = np.sqrt(px**2 + py**2)
+    theta = (np.arctan2(py, px) * 180 / np.pi) % 360
     ### END YOUR CODE
 
     return G, theta
@@ -149,11 +158,16 @@ def non_maximum_suppression(G, theta):
 
     # Round the gradient direction to the nearest 45 degrees
     theta = np.floor((theta + 22.5) / 45) * 45
-    theta = (theta % 360.0).astype(np.int32)
 
     #print(G)
     ### BEGIN YOUR CODE
-    pass
+    theta *= np.pi / 180
+    px = ((np.cos(theta) + 0.5) // 1).astype(int)
+    py = ((np.sin(theta) + 0.5) // 1).astype(int)
+    padded = np.pad(G, ((1, 1), (1, 1)), mode='constant')
+    ix = np.indices((H, W)) + 1
+    query = (G >= padded[ix[0] + py, ix[1] + px]) & (G >= padded[ix[0] - py, ix[1] - px])
+    out[query] = G[query]
     ### END YOUR CODE
 
     return out
@@ -178,7 +192,13 @@ def double_thresholding(img, high, low):
     weak_edges = np.zeros(img.shape, dtype=np.bool)
 
     ### YOUR CODE HERE
-    pass
+    H, W = img.shape
+    for i in range(H):
+        for j in range(W):
+            if img[i, j] > high:
+                strong_edges[i, j] = True
+            elif img[i, j] >= low:
+                weak_edges[i, j] = True
     ### END YOUR CODE
 
     return strong_edges, weak_edges
@@ -237,7 +257,17 @@ def link_edges(strong_edges, weak_edges):
     edges = np.copy(strong_edges)
 
     ### YOUR CODE HERE
-    pass
+    for y in range(H):
+        for x in range(W):
+            if strong_edges[y, x]:
+                q = deque([(y, x)])
+                while len(q) > 0:
+                    i, j = q.pop()
+                    neighbors = get_neighbors(i, j, H, W)
+                    for ni, nj in neighbors:
+                        if weak_edges[ni, nj] and not edges[ni, nj]:
+                            edges[ni, nj] = True
+                            q.appendleft((ni, nj))
     ### END YOUR CODE
 
     return edges
@@ -255,7 +285,12 @@ def canny(img, kernel_size=5, sigma=1.4, high=20, low=15):
         edge: numpy array of shape(H, W).
     """
     ### YOUR CODE HERE
-    pass
+    kernel = gaussian_kernel(kernel_size, sigma)
+    conv_filter = conv(img, kernel)
+    G, theta = gradient(conv_filter)
+    nms = non_maximum_suppression(G, theta)
+    strong_edges, weak_edges = double_thresholding(nms, high, low)
+    edge = link_edges(strong_edges, weak_edges)
     ### END YOUR CODE
 
     return edge
@@ -295,7 +330,10 @@ def hough_transform(img):
     # Find rho corresponding to values in thetas
     # and increment the accumulator in the corresponding coordiate.
     ### YOUR CODE HERE
-    pass
+    for x, y in zip(xs, ys):
+        for ix in range(thetas.shape[0]):
+            rho = x * cos_t[ix] + y * sin_t[ix]
+            accumulator[int(rho + diag_len), ix] += 1
     ### END YOUR CODE
 
     return accumulator, rhos, thetas
